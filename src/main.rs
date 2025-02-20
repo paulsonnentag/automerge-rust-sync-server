@@ -52,17 +52,33 @@ async fn main() {
                                 let content = if let Some(ref path) = path {
                                   println!("path: {}", path);
                                   
-                                  match DocumentId::from_str(&path[1..]) {
-                                    Ok(id) => {
-
-                                      match repo_clone.request_document(id).await {
-                                        Ok(doc) => doc_to_string(&doc),                                        
-                                        Err(e) => String::from(format!("error: {:?}", e)),
+                                  let parts: Vec<&str> = path[1..].split('/').collect();
+                                  match parts.get(0) {
+                                    Some(id_str) => {
+                                      match DocumentId::from_str(id_str) {
+                                        Ok(id) => {
+                                          match repo_clone.request_document(id).await {
+                                            Ok(doc) => {
+                                              if parts.get(1) == Some(&"full") {
+                                                doc_to_string_full(&doc)
+                                              } else {
+                                                doc_to_string(&doc)
+                                              }
+                                            },
+                                            Err(e) => String::from(format!("error: {:?}", e)),
+                                          }
+                                        }
+                                        Err(e) => {
+                                          String::from(
+                                              "Usage:\n\
+                                              - /:automergeId         - Get document content with truncated strings\n\
+                                              - /:automergeId/full    - Get complete document"
+                                          )
+                                        }
                                       }
-
-                                    }
-                                    Err(e) => {
-                                      String::from("with /:automergeId you can access the content of the document")
+                                    },
+                                    None => {
+                                      String::from("error")                                    
                                     }
                                   }
                                 } else {
@@ -107,9 +123,41 @@ async fn main() {
 }
 
 
-pub(crate) fn doc_to_string(doc_handle: &DocHandle) -> String {
+fn doc_to_string_full(doc_handle: &DocHandle) -> String {
   let checked_out_doc_json =
       doc_handle.with_doc(|d| serde_json::to_string(&automerge::AutoSerde::from(d)).unwrap());
 
   checked_out_doc_json.to_string()
+}
+
+fn doc_to_string(doc_handle: &DocHandle) -> String {
+    let json_value = doc_handle.with_doc(|d| {
+        let auto_serde = automerge::AutoSerde::from(d);
+        serde_json::to_value(&auto_serde).unwrap()
+    });
+
+    fn truncate_long_strings(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Object(map) => {
+                for (_, v) in map.iter_mut() {
+                    truncate_long_strings(v);
+                }
+            }
+            serde_json::Value::Array(arr) => {
+                for v in arr.iter_mut() {
+                    truncate_long_strings(v);
+                }
+            }
+            serde_json::Value::String(s) => {
+                if s.len() > 50 {
+                    *s = format!("{}...", &s[..47]);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut json_value = json_value;
+    truncate_long_strings(&mut json_value);
+    serde_json::to_string_pretty(&json_value).unwrap()
 }
