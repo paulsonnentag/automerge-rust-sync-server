@@ -67,7 +67,7 @@ async fn main() {
                                                 doc_to_string(&doc)
                                               }
                                             },
-                                            _ => String::from("failed to load document"),
+                                            _ => String::from("document not found"),
                                           }
                                         }
                                         Err(e) => {
