@@ -17,6 +17,8 @@ async fn main() {
 
     let handle = Handle::current();
 
+    println!("random id: {}", DocumentId::random());
+
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
         let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
@@ -57,18 +59,19 @@ async fn main() {
                                     Some(id_str) => {
                                       match DocumentId::from_str(id_str) {
                                         Ok(id) => {
-                                          match repo_clone.request_document(id).await {
-                                            Ok(doc) => {
+                                          match repo_clone.load(id).await {
+                                            Ok(Some(doc)) => {
                                               if parts.get(1) == Some(&"full") {
                                                 doc_to_string_full(&doc)
                                               } else {
                                                 doc_to_string(&doc)
                                               }
                                             },
-                                            Err(e) => String::from(format!("error: {:?}", e)),
+                                            _ => String::from("failed to load document"),
                                           }
                                         }
                                         Err(e) => {
+                                            println!("error: {:?}", e);
                                           String::from(
                                               "Usage:\n\
                                               - /:automergeId         - Get document content with truncated strings\n\
