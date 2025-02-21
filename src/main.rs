@@ -59,15 +59,16 @@ async fn main() {
                                     Some(id_str) => {
                                       match DocumentId::from_str(id_str) {
                                         Ok(id) => {
-                                          match repo_clone.load(id).await {
-                                            Ok(Some(doc)) => {
+
+                                          match repo_clone.request_document(id).await {
+                                            Ok(doc) => {
                                               if parts.get(1) == Some(&"full") {
                                                 doc_to_string_full(&doc)
                                               } else {
                                                 doc_to_string(&doc)
                                               }
                                             },
-                                            _ => String::from("document not found"),
+                                            Err(e) => String::from(format!("error: {:?}", e)),
                                           }
                                         }
                                         Err(e) => {
