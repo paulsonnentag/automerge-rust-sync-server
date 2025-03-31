@@ -17,7 +17,6 @@ async fn main() {
 
     let handle = Handle::current();
 
-    println!("random id: {}", DocumentId::random());
 
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
@@ -26,6 +25,7 @@ async fn main() {
         let listener = TcpListener::bind(&addr).await.unwrap();
 
         println!("started server on localhost:{}", port);
+        println!("repo id: {:?}", repo_handle.get_repo_id());
 
         loop {
             match listener.accept().await {
