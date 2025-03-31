@@ -25,7 +25,7 @@ async fn main() {
         let listener = TcpListener::bind(&addr).await.unwrap();
 
         println!("started server on localhost:{}", port);
-        println!("repo id: {:?}", repo_handle.get_repo_id());
+        println!("repo id: {:?}", repo_clone.get_repo_id().clone());
 
         loop {
             match listener.accept().await {
@@ -54,6 +54,7 @@ async fn main() {
                                 let content = if let Some(ref path) = path {
                                   println!("path: {}", path);
                                   
+                                  
                                   let parts: Vec<&str> = path[1..].split('/').collect();
                                   match parts.get(0) {
                                     Some(id_str) => {
@@ -72,12 +73,14 @@ async fn main() {
                                           }
                                         }
                                         Err(e) => {
+
+                                            let repo_id = repo_clone.get_repo_id().clone();
                                             println!("error: {:?}", e);
                                           String::from(
                                               format!("Repo id: {:?}\n\n\
                                               Usage:\n\
                                               - /:automergeId         - Get document content with truncated strings\n\
-                                              - /:automergeId/full    - Get complete document", repo_handle.get_repo_id())
+                                              - /:automergeId/full    - Get complete document", repo_id)
                                           )
                                         }
                                       }
