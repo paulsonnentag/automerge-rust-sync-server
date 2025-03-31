@@ -74,9 +74,10 @@ async fn main() {
                                         Err(e) => {
                                             println!("error: {:?}", e);
                                           String::from(
-                                              "Usage:\n\
+                                              format!("Repo id: {:?}\n\n\
+                                              Usage:\n\
                                               - /:automergeId         - Get document content with truncated strings\n\
-                                              - /:automergeId/full    - Get complete document"
+                                              - /:automergeId/full    - Get complete document", repo_handle.get_repo_id())
                                           )
                                         }
                                       }
