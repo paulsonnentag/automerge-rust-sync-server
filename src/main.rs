@@ -12,7 +12,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
-    let repo = Repo::new(None, Box::new(storage));
+    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
     let repo_handle = repo.run();
 
     let handle = Handle::current();
