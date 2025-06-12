@@ -10,8 +10,9 @@ use tracing_subscriber;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();
-
-    let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
+    // get home directory
+    let home = std::env::var("HOME").unwrap();
+    let storage = FsStorage::open(format!("{}/automerge-server-data", home)).unwrap();
     let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
     let repo_handle = repo.run();
 
