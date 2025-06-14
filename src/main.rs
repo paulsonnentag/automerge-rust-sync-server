@@ -25,7 +25,7 @@ impl SharePolicy for Restrictive {
         _document_id: &DocumentId,
         _from_peer: &RepoId,
     ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
-        Box::pin(async move { Ok(ShareDecision::DontShare) })
+        Box::pin(async move { Ok(ShareDecision::Share) })
     }
 
     fn should_announce(
