@@ -1,18 +1,50 @@
 use std::str::FromStr;
 
+use automerge_repo::share_policy::ShareDecision;
 use automerge_repo::tokio::FsStorage;
-use automerge_repo::{ConnDirection, DocHandle, DocumentId, Repo};
+use automerge_repo::{ConnDirection, DocHandle, DocumentId, Repo, RepoId, SharePolicy, SharePolicyError};
+use futures::future::BoxFuture;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tracing_subscriber;
 
+pub struct Restrictive;
+
+impl SharePolicy for Restrictive {
+    fn should_sync(
+        &self,
+        _document_id: &DocumentId,
+        _with_peer: &RepoId,
+    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
+        Box::pin(async move { Ok(ShareDecision::Share) })
+    }
+
+    fn should_request(
+        &self,
+        _document_id: &DocumentId,
+        _from_peer: &RepoId,
+    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
+        Box::pin(async move { Ok(ShareDecision::DontShare) })
+    }
+
+    fn should_announce(
+        &self,
+        _document_id: &DocumentId,
+        _to_peer: &RepoId,
+    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
+        Box::pin(async move { Ok(ShareDecision::DontShare) })
+    }
+}
+
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();
-
-    let storage = FsStorage::open("/tmp/automerge-server-data").unwrap();
-    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
+    // get home directory
+    let home = std::env::var("HOME").unwrap();
+    let storage = FsStorage::open(format!("{}/automerge-server-data", home)).unwrap();
+    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage)).with_share_policy(Box::new(Restrictive));
     let repo_handle = repo.run();
 
     let handle = Handle::current();
