@@ -114,7 +114,6 @@ async fn main() {
                 }
             }),
         )
-        .route("/test", get(|| async move { "Hello World" }));
 
     let http_port = std::env::var("HTTP_PORT").unwrap_or_else(|_| "3000".to_string());
     let http_addr = format!("0.0.0.0:{}", http_port);
