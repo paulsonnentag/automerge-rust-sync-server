@@ -8,9 +8,9 @@ use automerge_repo::{
 use axum::extract::Path;
 use axum::{routing::get, Router};
 use futures::future::BoxFuture;
-use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
+use tower_http::cors::CorsLayer;
 use tracing_subscriber;
 
 pub struct Restrictive;
@@ -90,7 +90,7 @@ async fn main() {
     // Start the HTTP server
     let app = Router::new()
         .route(
-            "/doc/:id",
+            "/doc/{id}",
             get(|Path(id): Path<String>| async move {
                 println!("Received request for document ID: {}", id);
                 match DocumentId::from_str(&id) {
@@ -114,6 +114,8 @@ async fn main() {
                 }
             }),
         )
+        .route("/", get(|| async { "fetch documents with /doc/{id}" }))
+        .layer(CorsLayer::permissive());
 
     let http_port = std::env::var("HTTP_PORT").unwrap_or_else(|_| "3000".to_string());
     let http_addr = format!("0.0.0.0:{}", http_port);
