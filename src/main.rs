@@ -45,8 +45,8 @@ impl SharePolicy for Restrictive {
 async fn main() {
     tracing_subscriber::fmt::init();
     // get home directory
-    let home = std::env::var("HOME").unwrap();
-    let storage = FsStorage::open(format!("{}/automerge-server-data", home)).unwrap();
+    let data_dir = std::env::var("DATA_DIR").unwrap();
+    let storage = FsStorage::open(data_dir).unwrap();
     let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
     let repo_handle = repo.run();
 
@@ -117,7 +117,7 @@ async fn main() {
         .route("/", get(|| async { "fetch documents with /doc/{id}" }))
         .layer(CorsLayer::permissive());
 
-    let http_port = std::env::var("HTTP_PORT").unwrap_or_else(|_| "3000".to_string());
+    let http_port = std::env::var("HTTP_PORT").unwrap_or_else(|_| "80".to_string());
     let http_addr = format!("0.0.0.0:{}", http_port);
     println!("starting HTTP server on {}", http_addr);
 
