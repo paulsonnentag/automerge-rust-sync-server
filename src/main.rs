@@ -47,7 +47,8 @@ async fn main() {
     // get home directory
     let data_dir = std::env::var("DATA_DIR").unwrap();
     let storage = FsStorage::open(data_dir).unwrap();
-    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
+    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage))
+        .with_share_policy(Box::new(Restrictive {}));
     let repo_handle = repo.run();
 
     let handle = Handle::current();
