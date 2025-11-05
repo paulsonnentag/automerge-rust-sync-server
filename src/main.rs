@@ -65,7 +65,8 @@ async fn main() {
         loop {
             match listener.accept().await {
                 Ok((mut socket, addr)) => {
-                    println!("client connected");
+                    let ip = addr.ip();
+                    println!("Client connected. IP: {ip}");
                     // Handle as automerge connection
                     tokio::spawn({
                         let repo_clone = repo_clone.clone();
@@ -74,8 +75,8 @@ async fn main() {
                                 .connect_tokio_io(addr, socket, ConnDirection::Incoming)
                                 .await
                             {
-                                Ok(_) => println!("Client connection completed successfully"),
-                                Err(e) => println!("Client connection error: {:?}", e),
+                                Ok(_) => println!("Client connection completed successfully. IP: {ip}"),
+                                Err(e) => println!("Client connection error: {:?}. IP: {ip}", e),
                             }
                         }
                     });
