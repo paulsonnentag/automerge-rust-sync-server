@@ -1,4 +1,7 @@
+use std::net::IpAddr;
 use std::str::FromStr;
+use std::sync::Arc;
+use lock_free::{HashMap};
 
 use automerge_repo::share_policy::ShareDecision;
 use automerge_repo::tokio::FsStorage;
@@ -41,6 +44,10 @@ impl SharePolicy for Restrictive {
     }
 }
 
+const BAN_DURATION: std::time::Duration = std::time::Duration::from_secs(600);
+const MAX_FAILED_ATTEMPTS: i64 = 50;
+const CONNECTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -51,7 +58,8 @@ async fn main() {
     let repo_handle = repo.run();
 
     let handle = Handle::current();
-
+    let ip_bans: Arc<HashMap<IpAddr, std::time::Instant>> = Arc::new(HashMap::new());
+    let ip_failed_attempts: Arc<HashMap<IpAddr, i64>> = Arc::new(HashMap::new());
     // Start the automerge sync server
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
@@ -66,17 +74,53 @@ async fn main() {
             match listener.accept().await {
                 Ok((mut socket, addr)) => {
                     let ip = addr.ip();
+                    let banned_at = ip_bans.get(&ip);
+                    if banned_at.is_some() {
+                        let time_since = std::time::Instant::now() - banned_at.unwrap();
+                        if time_since < BAN_DURATION {
+                            println!("Client connection rejected, banned for {} more minutes. IP: {ip}", (BAN_DURATION - time_since).as_secs() / 60);
+                            continue;
+                        } else {
+                            ip_bans.remove(&ip);
+                        }
+                    }
                     println!("Client connected. IP: {ip}");
                     // Handle as automerge connection
                     tokio::spawn({
                         let repo_clone = repo_clone.clone();
+                        let ip_bans = ip_bans.clone();
+                        let ip_failed_attempts = ip_failed_attempts.clone();
                         async move {
-                            match repo_clone
-                                .connect_tokio_io(addr, socket, ConnDirection::Incoming)
+                            let handle_error = || {
+                                let failed_attempts: i64 = ip_failed_attempts.get(&ip).unwrap_or(0);
+                                if failed_attempts >= MAX_FAILED_ATTEMPTS {
+                                    println!("Client has been banned for {} minutes. IP: {ip}", BAN_DURATION.as_secs() / 60);
+                                    ip_failed_attempts.insert(ip, 0);
+                                    ip_bans.insert(ip, std::time::Instant::now());
+                                } else {
+                                    ip_failed_attempts.insert(ip, failed_attempts + 1);
+                                }
+                            };
+                            match tokio::time::timeout(CONNECTION_TIMEOUT, repo_clone
+                                .connect_tokio_io(addr, socket, ConnDirection::Incoming))
                                 .await
                             {
-                                Ok(_) => println!("Client connection completed successfully. IP: {ip}"),
-                                Err(e) => println!("Client connection error: {:?}. IP: {ip}", e),
+                                
+                                Ok(Ok(_)) => {
+                                    println!("Client connection completed successfully. IP: {ip}");
+                                    // reset failed attempts
+                                    ip_failed_attempts.insert(ip, 0);
+                                    // remove from banned list
+                                    ip_bans.remove(&ip);
+                                },
+                                Ok(Err(e)) =>{
+                                    println!("Client connection error: {:?}. IP: {ip}", e);
+                                    handle_error();
+                                }
+                                Err(e) => {
+                                    println!("Client connection timed out. IP: {ip}");
+                                    handle_error();
+                                }
                             }
                         }
                     });
