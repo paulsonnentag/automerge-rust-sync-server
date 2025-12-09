@@ -72,7 +72,7 @@ async fn main() {
 
         loop {
             match listener.accept().await {
-                Ok((mut socket, addr)) => {
+                Ok((socket, addr)) => {
                     let ip = addr.ip();
                     let banned_at = ip_bans.get(&ip);
                     if banned_at.is_some() {
@@ -117,7 +117,7 @@ async fn main() {
                                     println!("Client connection error: {:?}. IP: {ip}", e);
                                     handle_error();
                                 }
-                                Err(e) => {
+                                Err(_e) => {
                                     println!("Client connection timed out. IP: {ip}");
                                     handle_error();
                                 }
@@ -181,6 +181,7 @@ fn doc_to_string_full(doc_handle: &DocHandle) -> String {
     checked_out_doc_json.to_string()
 }
 
+#[allow(dead_code)]
 fn doc_to_string(doc_handle: &DocHandle) -> String {
     let json_value = doc_handle.with_doc(|d| {
         let auto_serde = automerge::AutoSerde::from(d);
