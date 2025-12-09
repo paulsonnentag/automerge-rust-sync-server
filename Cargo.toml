@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-automerge = "0.7.0"
+automerge = "0.7.2"
 automerge_repo = { version = "0.3.0", features = [
   "tokio",
 ] }
