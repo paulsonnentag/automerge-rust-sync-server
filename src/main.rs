@@ -27,9 +27,9 @@ async fn main() {
 
     let repo_handle = Repo::build_tokio()
         .with_storage(storage)
-        .with_announce_policy(move |_, _| {
-            false
-        })
+        // .with_announce_policy(move |_, _| {
+        //     false
+        // })
         .load()
         .await;
 
