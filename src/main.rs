@@ -12,15 +12,17 @@ use axum::{routing::get, Router};
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
 
 const BAN_DURATION: std::time::Duration = std::time::Duration::from_secs(600);
 const MAX_FAILED_ATTEMPTS: i64 = 50;
 const CONNECTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+mod tracing;
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    tracing::initialize_tracing();
+
     // get home directory
     let data_dir = std::env::var("DATA_DIR").unwrap();
     let storage = TokioFilesystemStorage::new(data_dir);
