@@ -8,7 +8,9 @@ automerge = "0.7.2"
 samod = { git="https://github.com/LilithSilver/samod.git", branch="patchwork", features = ["tokio"] }
 futures = "0.3.31"
 tokio = { version = "1.41.1", features = ["full"] }
-tracing-subscriber = "0.3.18"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+tracing = "0.1.40"
+tracing-appender = "0.2.2"
 serde_json = "1.0.138"
 uuid = { version = "1.17.0", features = ["v4"] }
 axum = "0.8"
