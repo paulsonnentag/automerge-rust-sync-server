@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 automerge = "0.7.2"
-samod = { git="https://github.com/LilithSilver/samod.git", branch="patchwork", features = ["tokio"] }
+samod = { git="https://github.com/LilithSilver/samod.git", branch="patchwork", features = ["tokio", "threadpool"] }
+rayon = "1.11.0"
 futures = "0.3.31"
 tokio = { version = "1.41.1", features = ["full"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
