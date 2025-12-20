@@ -5,7 +5,7 @@ use lock_free::{HashMap};
 
 use samod::storage::TokioFilesystemStorage;
 use samod::{
-    ConcurrencyConfig, ConnDirection, DocHandle, DocumentId, Repo
+    ConnDirection, DocHandle, DocumentId, Repo
 };
 use axum::extract::Path;
 use axum::{routing::get, Router};
@@ -29,7 +29,6 @@ async fn main() {
 
     let repo_handle = Repo::build_tokio()
         .with_storage(storage)
-		.with_concurrency(ConcurrencyConfig::Threadpool(rayon::ThreadPoolBuilder::new().build().unwrap()))
         // .with_announce_policy(move |_, _| {
         //     false
         // })
