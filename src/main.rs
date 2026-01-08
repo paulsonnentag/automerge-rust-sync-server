@@ -3,59 +3,38 @@ use std::str::FromStr;
 use std::sync::Arc;
 use lock_free::{HashMap};
 
-use automerge_repo::share_policy::ShareDecision;
-use automerge_repo::tokio::FsStorage;
-use automerge_repo::{
-    ConnDirection, DocHandle, DocumentId, Repo, RepoId, SharePolicy, SharePolicyError,
+use samod::storage::TokioFilesystemStorage;
+use samod::{
+    ConcurrencyConfig, ConnDirection, DocHandle, DocumentId, Repo
 };
 use axum::extract::Path;
 use axum::{routing::get, Router};
-use futures::future::BoxFuture;
 use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
-
-pub struct Restrictive;
-
-impl SharePolicy for Restrictive {
-    fn should_sync(
-        &self,
-        _document_id: &DocumentId,
-        _with_peer: &RepoId,
-    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
-        Box::pin(async move { Ok(ShareDecision::Share) })
-    }
-
-    fn should_request(
-        &self,
-        _document_id: &DocumentId,
-        _from_peer: &RepoId,
-    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
-        Box::pin(async move { Ok(ShareDecision::Share) })
-    }
-
-    fn should_announce(
-        &self,
-        _document_id: &DocumentId,
-        _to_peer: &RepoId,
-    ) -> BoxFuture<'static, Result<ShareDecision, SharePolicyError>> {
-        Box::pin(async move { Ok(ShareDecision::DontShare) })
-    }
-}
 
 const BAN_DURATION: std::time::Duration = std::time::Duration::from_secs(600);
 const MAX_FAILED_ATTEMPTS: i64 = 50;
 const CONNECTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+mod tracing;
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    tracing::initialize_tracing();
+
     // get home directory
     let data_dir = std::env::var("DATA_DIR").unwrap();
-    let storage = FsStorage::open(data_dir).unwrap();
-    let repo = Repo::new(Some("sync-server".to_string()), Box::new(storage));
-    let repo_handle = repo.run();
+    let storage = TokioFilesystemStorage::new(data_dir);
+
+    let repo_handle = Repo::build_tokio()
+        .with_concurrency(ConcurrencyConfig::Threadpool(rayon::ThreadPoolBuilder::new().build().unwrap()))
+        .with_storage(storage)
+        // .with_announce_policy(move |_, _| {
+        //     false
+        // })
+        .load()
+        .await;
 
     let handle = Handle::current();
     let ip_bans: Arc<HashMap<IpAddr, std::time::Instant>> = Arc::new(HashMap::new());
@@ -63,12 +42,13 @@ async fn main() {
     // Start the automerge sync server
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
-        let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+        let port = std::env::var("PORT").unwrap_or_else(|_| "8085".to_string());
         let addr = format!("0.0.0.0:{}", port);
         let listener = TcpListener::bind(&addr).await.unwrap();
 
         println!("started automerge sync server on localhost:{}", port);
-        println!("repo id: {:?}", repo_clone.get_repo_id().clone());
+        // TODO (Samod): Figure out what repo id is
+        // println!("repo id: {:?}", repo_clone);
 
         loop {
             match listener.accept().await {
@@ -101,11 +81,12 @@ async fn main() {
                                     ip_failed_attempts.insert(ip, failed_attempts + 1);
                                 }
                             };
-                            match tokio::time::timeout(CONNECTION_TIMEOUT, repo_clone
-                                .connect_tokio_io(addr, socket, ConnDirection::Incoming))
-                                .await
-                            {
-                                
+
+                            let connection = repo_clone
+                                .connect_tokio_io(socket, ConnDirection::Incoming).unwrap();
+
+                            match tokio::time::timeout(CONNECTION_TIMEOUT, connection.handshake_complete()).await
+                            {                                
                                 Ok(Ok(_)) => {
                                     println!("Client connection completed successfully. IP: {ip}");
                                     // reset failed attempts
@@ -117,7 +98,7 @@ async fn main() {
                                     println!("Client connection error: {:?}. IP: {ip}", e);
                                     handle_error();
                                 }
-                                Err(_e) => {
+                                Err(_) => {
                                     println!("Client connection timed out. IP: {ip}");
                                     handle_error();
                                 }
@@ -141,14 +122,20 @@ async fn main() {
                 match DocumentId::from_str(&id) {
                     Ok(document_id) => {
                         println!("Successfully parsed document ID");
-                        match repo_handle_clone.request_document(document_id).await {
-                            Ok(doc_handle) => {
+                        match repo_handle_clone.find(document_id).await {
+                            Ok(Some(doc_handle)) => {
                                 println!("Successfully retrieved document");
                                 doc_to_string_full(&doc_handle)
                             }
-                            Err(e) => {
-                                println!("Error retrieving document: {:?}", e);
-                                format!("Error retrieving document: {:?}", e)
+                            Ok(None) => {
+                                let errstr = "Error retrieving document: Not found!".to_string();
+                                println!("{}", errstr);
+                                errstr
+                            }
+                            Err(_) => {
+                                let errstr = "Error retrieving document: Repo stopped!".to_string();
+                                println!("{}", errstr);
+                                errstr
                             }
                         }
                     }
@@ -171,20 +158,20 @@ async fn main() {
 
     tokio::signal::ctrl_c().await.unwrap();
 
-    repo_handle.stop().unwrap();
+    repo_handle.stop().await;
 }
 
 fn doc_to_string_full(doc_handle: &DocHandle) -> String {
     let checked_out_doc_json =
-        doc_handle.with_doc(|d| serde_json::to_string(&automerge::AutoSerde::from(d)).unwrap());
+        doc_handle.with_document(|d| serde_json::to_string(&automerge::AutoSerde::from(&*d)).unwrap());
 
     checked_out_doc_json.to_string()
 }
 
 #[allow(dead_code)]
 fn doc_to_string(doc_handle: &DocHandle) -> String {
-    let json_value = doc_handle.with_doc(|d| {
-        let auto_serde = automerge::AutoSerde::from(d);
+    let json_value = doc_handle.with_document(|d| {
+        let auto_serde = automerge::AutoSerde::from(&*d);
         serde_json::to_value(&auto_serde).unwrap()
     });
 
