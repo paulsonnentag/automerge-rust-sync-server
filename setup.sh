@@ -29,18 +29,18 @@ sudo systemctl daemon-reload
 
 # Start the services
 echo "Starting services..."
-sudo systemctl start sync-server-dev.service
+# sudo systemctl start sync-server-dev.service
 sudo systemctl start sync-server-prod.service
 
 # Enable services to start on boot
-sudo systemctl enable sync-server-dev.service
+# sudo systemctl enable sync-server-dev.service
 sudo systemctl enable sync-server-prod.service
 
 echo "Services started and enabled!"
 echo ""
-echo "Development server: http://localhost:81 (port 8081)"
-echo "Production server:  http://localhost:80 (port 8080)"
+#echo "Development server: http://localhost:81 (port 8086)"
+echo "Production server:  http://localhost:80 (port 8085)"
 echo ""
 echo "Check status with:"
-echo "  sudo systemctl status sync-server-dev.service"
+#echo "  sudo systemctl status sync-server-dev.service"
 echo "  sudo systemctl status sync-server-prod.service"

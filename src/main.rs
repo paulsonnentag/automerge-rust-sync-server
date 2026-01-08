@@ -42,7 +42,7 @@ async fn main() {
     // Start the automerge sync server
     let repo_clone = repo_handle.clone();
     handle.spawn(async move {
-        let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+        let port = std::env::var("PORT").unwrap_or_else(|_| "8085".to_string());
         let addr = format!("0.0.0.0:{}", port);
         let listener = TcpListener::bind(&addr).await.unwrap();
 
