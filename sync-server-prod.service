@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-Environment="RUST_BACKTRACE=1" "RUST_LOG=automerge_repo=debug,info" "DATA_DIR=/root/automerge-server-data/prod" "PORT=8085" "HTTP_PORT=3000"
+Environment="RUST_BACKTRACE=full" "RUST_LOG=automerge_repo=debug,info" "DATA_DIR=/root/automerge-server-data/prod" "PORT=8085" "HTTP_PORT=3000"
 WorkingDirectory=/root/automerge-rust-sync-server
 ExecStart=/root/.cargo/bin/cargo run --release
 Restart=always
